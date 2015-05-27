@@ -1,10 +1,17 @@
 from django.db import models
 from django.db.models.fields import AutoField
+from geopy import Nominatim
+from django.template.defaultfilters import default
 
 # We create 4 models for the demo : person, event, location, address
     
-class sp_address (models.Model):    
+class sp_address (models.Model): 
+    ADD_TYPE = (
+        ('H', 'Home'),
+        ('W', 'Work')
+    )   
     address_id = models.AutoField (primary_key=True)
+    address_type = models.CharField (max_length=1, choices=ADD_TYPE, default="H")
     street_number = models.IntegerField ()
     street_name = models.CharField (max_length=200, null=True)
     city = models.CharField(max_length=200)
@@ -36,11 +43,24 @@ class sp_location (models.Model):
     city = models.CharField(max_length=200, null=True)
     postal_code = models.CharField(max_length=5, null=True)
     country = models.CharField(max_length=100, null=True) 
-    longitude = models.CharField(max_length=200)    
-    latitude = models.CharField(max_length=200)
+    longitude = models.CharField(max_length=200, null=True)    
+    latitude = models.CharField(max_length=200, null=True)
     
     def __str__(self):
         return self.name + " : " + self.description    
+    
+    '''
+    override the default saving method
+    if the longitude/latitude is empty, calculate them with geopy
+    '''
+    def save (self, *args, **kwargs):
+        if self.longitude == "" or self.latitude == "":
+            geolocator = Nominatim ()
+            full_add = self.street_number + " " + self.street_name + " " + self.city + " " + self.country
+            location = geolocator.geocode (full_add)
+            self.longitude = location.longitude()
+            self.latitude = location.latitude()
+        
     
 class sp_event (models.Model):
     event_id = models.AutoField (primary_key=True)
