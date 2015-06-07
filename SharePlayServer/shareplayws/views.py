@@ -1,10 +1,12 @@
-from django.http import HttpResponse
+from django.http import HttpResponse 
 from rest_framework import status
 from rest_framework.response import Response
 from shareplayws.models import sp_event, sp_person, sp_location, sp_address, sp_player
 from shareplayws.serializers import PersonSerializer, EventSerializerPOST, EventSerializerGET, LocationSerializer, AddressSerializer, PlayerSerializerPOST, PlayerSerializerGET
 from rest_framework.views import APIView
 from rest_framework import generics
+from geopy import Vincenty
+from piston_mini_client.failhandlers import NoneFailHandler
 
 
 class PersonList(APIView):
@@ -140,6 +142,7 @@ class LocationDetail (APIView):
             return sp_location.objects.get(pk=pk)
         except sp_location.DoesNotExist:
             return Response(status=status.HTTP_404_NOT_FOUND)
+            
     
     #return the location with pk
     def get (self, request, pk, format=None):
@@ -192,4 +195,16 @@ class AddressDetail (generics.RetrieveUpdateDestroyAPIView):
     """
     queryset = sp_address.objects.all()
     serializer_class = AddressSerializer
+    
+class NearbyLocationList ():
+    """
+    Retrieve the list of nearby locations for user
+    """
+    
+    def get (self, request, long, lat, distance, format=None):
+        locations = sp_location.object.all()
+        for location in locations:
+            
+            
+        
             

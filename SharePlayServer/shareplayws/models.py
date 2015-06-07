@@ -17,6 +17,8 @@ class sp_address (models.Model):
     city = models.CharField(max_length=200)
     postal_code = models.CharField(max_length=5)
     country = models.CharField(max_length=100) 
+    longitude = models.FloatField(max_length=200, null=True)    
+    latitude = models.FloatField(max_length=200, null=True)
     
     def __str__(self):
         return str(self.street_number) + " " + self.street_name + " " + self.city + " " + self.postal_code + " " + self.country    
@@ -28,9 +30,26 @@ class sp_person (models.Model):
     telephone = models.CharField(max_length=20, null=False)
     email = models.CharField(max_length=200)
     postal_address = models.ForeignKey(sp_address, null=True)
+    longitude = models.FloatField(max_length=200, null=True)    
+    latitude = models.FloatField(max_length=200, null=True)
+    last_know_long = models.FloatField(max_length=200, null=True)
+    last_know_lat = models.FloatField(max_length=200, null=True)    
     
     def __str__(self):
-        return self.firstname + " " + self.lastname    
+        return self.firstname + " " + self.lastname
+    
+    '''
+    override the default saving method
+    if the longitude/latitude is empty, use the last known ones
+    '''
+    def save (self, *args, **kwargs):     
+        if self.longitude == "" or self.latitude == "":
+            self.longitude = self.last_know_long
+            self.latitude = self.last_know_lat
+        else:
+            self.last_know_long = self.longitude
+            self.last_know_lat = self.latitude
+        super (sp_person, self).save (*args, **kwargs)
     
 class sp_location (models.Model):    
     location_id = models.AutoField (primary_key=True)
@@ -43,8 +62,8 @@ class sp_location (models.Model):
     city = models.CharField(max_length=200, null=True)
     postal_code = models.CharField(max_length=5, null=True)
     country = models.CharField(max_length=100, null=True) 
-    longitude = models.CharField(max_length=200, null=True)    
-    latitude = models.CharField(max_length=200, null=True)
+    longitude = models.FloatField(max_length=200, null=True)    
+    latitude = models.FloatField(max_length=200, null=True)
     
     def __str__(self):
         return self.name + " : " + self.description    
@@ -56,11 +75,11 @@ class sp_location (models.Model):
     def save (self, *args, **kwargs):
         if self.longitude == "" or self.latitude == "":
             geolocator = Nominatim ()
-            full_add = self.street_number + " " + self.street_name + " " + self.city + " " + self.country
+            full_add = str(self.street_number) + " " + self.street_name + " " + self.city + " " + self.country
             location = geolocator.geocode (full_add)
             self.longitude = location.longitude()
             self.latitude = location.latitude()
-        
+        super (sp_location, self).save (*args, **kwargs)
     
 class sp_event (models.Model):
     event_id = models.AutoField (primary_key=True)
@@ -82,5 +101,16 @@ class sp_player (models.Model):
     
     def __str__(self):
         return self.player.firstname + " played for " + self.event.name
+    
+    
+class sp_nearby_location (models.Model):
+    person = models.ForeignKey (sp_person)
+    location = models.ForeignKey (sp_location)
+    address = models.ForeignKey (sp_address, null = True)
+    distance = models.FloatField (max_length = 20, null = True)
+    
+    def __str__(self):
+        return self.location.name + " is " + self.distance + " metres away from " + self.person.firstname
+        
     
     
