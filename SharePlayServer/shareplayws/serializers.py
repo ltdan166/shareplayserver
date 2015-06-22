@@ -11,7 +11,7 @@ from django.views.i18n import null_javascript_catalog
 class AddressSerializer(serializers.ModelSerializer):
     class Meta:
         model = sp_address
-        fields = ('address_id', 'street_number', 'street_name', 'city', 'postal_code', 'country')
+        fields = ('address_id', 'address_type', 'street_number', 'street_name', 'city', 'postal_code', 'country', 'latitude', 'longitude')
 
 class PersonSerializer(serializers.ModelSerializer):
     postal_address = AddressSerializer()
@@ -19,7 +19,33 @@ class PersonSerializer(serializers.ModelSerializer):
     class Meta:
         model = sp_person
         fields = ('userid', 'firstname', 'lastname', 'email', 'telephone', 'postal_address')
-              
+        depth = 1
+        
+        
+class PersonSerializerPOST (serializers.ModelSerializer):  
+    userid = serializers.CharField (max_length=10)
+    firstname = serializers.CharField (max_length=200)
+    lastname = serializers.CharField (max_length=200)
+    email = serializers.CharField (max_length=200)
+    telephone = serializers.CharField (max_length=20)
+    postal_address = AddressSerializer()
+    
+    class Meta:
+        model = sp_person        
+        fields = ('userid', 'firstname', 'lastname', 'email', 'telephone', 'postal_address')
+        depth = 1
+     
+    def create (self, validated_data):
+        #take out the address data and create an address record with them        
+        address_data = validated_data.pop('postal_address')   
+        postal_address = sp_address (address_type = address_data['address_type'], street_number = address_data['street_number'], street_name = address_data['street_name'], city = address_data['city'], postal_code=address_data['postal_code'], country=address_data['country'] )
+        postal_address.save ()
+        
+        #create a person with address
+        person = sp_person (userid = validated_data['userid'], firstname = validated_data['firstname'], lastname = validated_data['lastname'], email=validated_data['email'], telephone=validated_data['telephone'], postal_address=postal_address)
+        person.save ()
+        return person
+         
 class LocationSerializer (serializers.ModelSerializer):
     class Meta:
         model = sp_location
@@ -46,11 +72,7 @@ class EventSerializerPOST (serializers.ModelSerializer):
             return event                 
         except ObjectDoesNotExist:
             raise serializers.ValidationError()
-    '''    
-    def update (self, validated_data):
-        try
-    '''        
-        
+                     
 class EventSerializerGET (serializers.ModelSerializer):    
     name = serializers.CharField(max_length=200)    
     owner = PersonSerializer ()

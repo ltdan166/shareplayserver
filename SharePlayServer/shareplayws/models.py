@@ -16,12 +16,25 @@ class sp_address (models.Model):
     street_name = models.CharField (max_length=200, null=True)
     city = models.CharField(max_length=200)
     postal_code = models.CharField(max_length=5)
-    country = models.CharField(max_length=100) 
-    longitude = models.FloatField(max_length=200, null=True)    
-    latitude = models.FloatField(max_length=200, null=True)
+    country = models.CharField(max_length=100)
+    longitude = models.FloatField(max_length=200, null=True, blank=True)    
+    latitude = models.FloatField(max_length=200, null=True, blank=True)     
     
     def __str__(self):
-        return str(self.street_number) + " " + self.street_name + " " + self.city + " " + self.postal_code + " " + self.country    
+        return str(self.street_number) + " " + self.street_name + " " + self.city + " " + self.postal_code + " " + self.country   
+    
+    '''
+    override the default saving method
+    if the longitude/latitude is empty, calculate them with geopy
+    '''
+    def save (self, *args, **kwargs):
+        if self.longitude is None or self.latitude is None:
+            geolocator = Nominatim ()
+            full_add = str(self.street_number) + " " + self.street_name + " " + self.city + " " + self.country
+            location = geolocator.geocode (full_add)
+            self.longitude = location.longitude
+            self.latitude = location.latitude
+        super (sp_address, self).save (*args, **kwargs) 
     
 class sp_person (models.Model):
     userid = models.CharField(max_length=10, primary_key=True)
@@ -30,10 +43,10 @@ class sp_person (models.Model):
     telephone = models.CharField(max_length=20, null=False)
     email = models.CharField(max_length=200)
     postal_address = models.ForeignKey(sp_address, null=True)
-    longitude = models.FloatField(max_length=200, null=True)    
-    latitude = models.FloatField(max_length=200, null=True)
-    last_know_long = models.FloatField(max_length=200, null=True)
-    last_know_lat = models.FloatField(max_length=200, null=True)    
+    longitude = models.FloatField(max_length=200, null=True, blank=True)    
+    latitude = models.FloatField(max_length=200, null=True, blank=True)
+    last_know_long = models.FloatField(max_length=200, null=True, blank=True)
+    last_know_lat = models.FloatField(max_length=200, null=True, blank=True)    
     
     def __str__(self):
         return self.firstname + " " + self.lastname
@@ -43,7 +56,7 @@ class sp_person (models.Model):
     if the longitude/latitude is empty, use the last known ones
     '''
     def save (self, *args, **kwargs):     
-        if self.longitude == "" or self.latitude == "":
+        if self.longitude is None or self.latitude is None:
             self.longitude = self.last_know_long
             self.latitude = self.last_know_lat
         else:
@@ -62,8 +75,8 @@ class sp_location (models.Model):
     city = models.CharField(max_length=200, null=True)
     postal_code = models.CharField(max_length=5, null=True)
     country = models.CharField(max_length=100, null=True) 
-    longitude = models.FloatField(max_length=200, null=True)    
-    latitude = models.FloatField(max_length=200, null=True)
+    longitude = models.FloatField(max_length=200, null=True, blank=True)    
+    latitude = models.FloatField(max_length=200, null=True, blank=True)
     
     def __str__(self):
         return self.name + " : " + self.description    
@@ -73,12 +86,17 @@ class sp_location (models.Model):
     if the longitude/latitude is empty, calculate them with geopy
     '''
     def save (self, *args, **kwargs):
-        if self.longitude == "" or self.latitude == "":
-            geolocator = Nominatim ()
-            full_add = str(self.street_number) + " " + self.street_name + " " + self.city + " " + self.country
-            location = geolocator.geocode (full_add)
-            self.longitude = location.longitude()
-            self.latitude = location.latitude()
+        geolocator = Nominatim ()
+        full_add = str(self.street_number) + " " + self.street_name + " " + self.city + " " + self.country
+        location = geolocator.geocode (full_add)
+        if location is not None:
+            self.longitude = location.longitude
+            self.latitude = location.latitude
+        else :
+            self.longitude = 0
+            self.latitude = 0
+            
+        print (full_add)
         super (sp_location, self).save (*args, **kwargs)
     
 class sp_event (models.Model):
@@ -102,7 +120,7 @@ class sp_player (models.Model):
     def __str__(self):
         return self.player.firstname + " played for " + self.event.name
     
-    
+"""    
 class sp_nearby_location (models.Model):
     person = models.ForeignKey (sp_person)
     location = models.ForeignKey (sp_location)
@@ -111,6 +129,19 @@ class sp_nearby_location (models.Model):
     
     def __str__(self):
         return self.location.name + " is " + self.distance + " metres away from " + self.person.firstname
+                    
+    def getnearbylist (cls):
+        locations = sp_location.object.all()
+        gps_user = (self.person.latitude, self.person.longitude)
+        nearby_loc_lst = []
         
-    
+        for each location, calculate the distance from user's one then return the list
+        for location in locations:
+            gps_loc = (location.latitude, location.longitude)
+            dist = vincenty (gps_user, gps_loc).meters
+            if dist <= distance:
+                nearby_loc_lst.append(location)
+        return nearby_loc_lst
+           
+"""    
     

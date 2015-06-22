@@ -2,10 +2,10 @@ from django.http import HttpResponse
 from rest_framework import status
 from rest_framework.response import Response
 from shareplayws.models import sp_event, sp_person, sp_location, sp_address, sp_player
-from shareplayws.serializers import PersonSerializer, EventSerializerPOST, EventSerializerGET, LocationSerializer, AddressSerializer, PlayerSerializerPOST, PlayerSerializerGET
+from shareplayws.serializers import PersonSerializer, PersonSerializerPOST, EventSerializerPOST, EventSerializerGET, LocationSerializer, AddressSerializer, PlayerSerializerPOST, PlayerSerializerGET
 from rest_framework.views import APIView
 from rest_framework import generics
-from geopy import Vincenty
+from geopy.distance import vincenty
 from piston_mini_client.failhandlers import NoneFailHandler
 
 
@@ -20,12 +20,12 @@ class PersonList(APIView):
         return Response(serializer.data)
         
     def post (self, request, format=None):
-        serializer = PersonSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save()
+        serializer = PersonSerializerPOST(data=request.data)
+        if serializer.is_valid():            
+            serializer.save()     
             return Response (serializer.data, status=status.HTTP_201_CREATED)
         return Response (serializer.data, status=status.HTTP_400_BAD_REQUEST)  
-
+          
 
 class PersonDetail(APIView):
     """
@@ -130,7 +130,7 @@ class LocationList (APIView):
             serializer.save()
             return Response (serializer.data, status=status.HTTP_201_CREATED)
         return Response (serializer.data, status=status.HTTP_400_BAD_REQUEST)  
-
+    
 class LocationDetail (APIView):
     """
     Retrieve, update, delete a location
@@ -195,16 +195,50 @@ class AddressDetail (generics.RetrieveUpdateDestroyAPIView):
     """
     queryset = sp_address.objects.all()
     serializer_class = AddressSerializer
-    
-class NearbyLocationList ():
+
+class NearbyLocationList (generics.ListAPIView):
     """
     Retrieve the list of nearby locations for user
     """
+    serializer_class = LocationSerializer    
     
-    def get (self, request, long, lat, distance, format=None):
-        locations = sp_location.object.all()
-        for location in locations:
-            
-            
+    def get_queryset (self):        
+        locations = sp_location.objects.all()
+        locations_list = list (locations)
+        long = self.request.query_params.get ('long', None)
+        lat = self.request.query_params.get ('lat', None)
+        distance = self.request.query_params.get ('distance', None)
+        if distance is None:
+            distance = 5000 
+                
+        #Debug information on actual user's location        
+        print ('Actual User''s Location : ')        
+        print ('lat :' + lat + ' long : ' + long + ' distance : ' + str(distance))
+        print ('----------------------------------')
+        #end debug    
         
+        if long is not None and lat is not None and distance is not None:
+            gps_user = (lat, long)
+            nearby_loc_lst = []
+            
+            """for each location, calculate the distance from user's one then return the list"""
+            for location in locations_list:
+                gps_loc = (location.latitude, location.longitude)                
+                dist = vincenty (gps_user, gps_loc).meters
+                
+                #debug information on location 
+                print ('----------------------------------')
+                print (location)
+                print ('lat :' + location.latitude + ' long : ' + location.longitude) 
+                print ('Distance : ' + str(dist))
+                print ('----------------------------------')
+                #end debug
+                
+                if dist <= float(distance):
+                    nearby_loc_lst.append(location)
+                    
+            if nearby_loc_lst.__sizeof__() > 0:
+                serializer = LocationSerializer (nearby_loc_lst)
+                return nearby_loc_lst
+        return None
             

@@ -25,7 +25,7 @@ SECRET_KEY = 'oo*6_t1wg)z3@)yary$=4y#r5%-_&o60#qym&kxki58kd4kq0p'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['192.168.1.83','192.168.1.43']
+ALLOWED_HOSTS = ['192.168.1.83','192.168.1.43', '192.168.1.70']
 
 
 # Application definition
@@ -79,8 +79,7 @@ WSGI_APPLICATION = 'SharePlayServer.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        'HOST':'localhost',
-        #'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
+        'HOST':'192.168.1.43',        
         'NAME':'shareplay',
         'USER':'postgres',
         #'USER':'sp_dbadmin',
@@ -106,6 +105,34 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.AllowAny'
     ]
+}
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': True,
+    'formatters': {
+        'verbose': {
+            'format': '%(levelname)s %(asctime)s %(module)s %(process)d %(thread)d %(message)s'
+        },
+    },
+    'handlers': {
+        'console': {
+            'level': 'NOTSET',
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose'
+        }
+    },
+    'loggers': {
+        '': {
+            'handlers': ['console'],
+            'level': 'NOTSET',
+        },
+        'django.request': {
+            'handlers': ['console'],
+            'propagate': False,
+            'level': 'ERROR'
+        }
+    }
 }
 
 

@@ -50,6 +50,10 @@ urlpatterns = [
     #location detail
     #url(r'^player/(?P<pk>[0-9]+)/$', views.PlayerDetail.as_view()),
     
+    #url for nearby location rest api
+    #nearby location list  
+    url(r'^nearby$', views.NearbyLocationList.as_view()),
+    
 ]
 
 urlpatterns = format_suffix_patterns(urlpatterns)
