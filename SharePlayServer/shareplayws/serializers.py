@@ -7,6 +7,7 @@ from rest_framework import serializers
 from shareplayws.models import sp_person, sp_event, sp_location, sp_address, sp_player
 from django.core.exceptions import ObjectDoesNotExist
 from django.views.i18n import null_javascript_catalog
+from django.contrib.auth.models import User 
 
 class AddressSerializer(serializers.ModelSerializer):
     class Meta:
@@ -24,6 +25,7 @@ class PersonSerializer(serializers.ModelSerializer):
         
 class PersonSerializerPOST (serializers.ModelSerializer):  
     userid = serializers.CharField (max_length=10)
+    password = serializers.CharField (max_length=50)
     firstname = serializers.CharField (max_length=200)
     lastname = serializers.CharField (max_length=200)
     email = serializers.CharField (max_length=200)
@@ -32,7 +34,7 @@ class PersonSerializerPOST (serializers.ModelSerializer):
     
     class Meta:
         model = sp_person        
-        fields = ('userid', 'firstname', 'lastname', 'email', 'telephone', 'postal_address')
+        fields = ('userid', 'password', 'firstname', 'lastname', 'email', 'telephone', 'postal_address')
         depth = 1
      
     def create (self, validated_data):
@@ -42,8 +44,13 @@ class PersonSerializerPOST (serializers.ModelSerializer):
         postal_address.save ()
         
         #create a person with address
-        person = sp_person (userid = validated_data['userid'], firstname = validated_data['firstname'], lastname = validated_data['lastname'], email=validated_data['email'], telephone=validated_data['telephone'], postal_address=postal_address)
+        person = sp_person (userid = validated_data['userid'], password = validated_data['password'], firstname = validated_data['firstname'], lastname = validated_data['lastname'], email=validated_data['email'], telephone=validated_data['telephone'], postal_address=postal_address)
         person.save ()
+        
+        #create the user profile of the person
+        profile = User.objects.create_user(validated_data['userid'], validated_data['email'], validated_data['password'])
+        profile.save ()
+        
         return person
          
 class LocationSerializer (serializers.ModelSerializer):
@@ -63,6 +70,7 @@ class EventSerializerPOST (serializers.ModelSerializer):
         fields = ('event_id', 'name', 'owner', 'event_date', 'location')
         depth = 1
         
+    #create event
     def create (self, validated_data):
         try:                        
             owner = sp_person.objects.get(userid=validated_data['owner'])            
@@ -72,17 +80,39 @@ class EventSerializerPOST (serializers.ModelSerializer):
             return event                 
         except ObjectDoesNotExist:
             raise serializers.ValidationError()
-                     
+        
+    #update event
+    def update (self, instance, validated_data):
+        try:
+            instance.name = validated_data['name']
+            instance.location = sp_location.objects.get (location_id=validated_data['location'])
+            instance.event_date = validated_data['event_date']
+            instance.save ()
+        except ObjectDoesNotExist:
+            raise serializers.ValidationError()
+
+class PlayerSerializerGET (serializers.ModelSerializer):
+    event = serializers.CharField(max_length=200)
+    player = serializers.CharField(max_length=200)
+    inviter = serializers.CharField(max_length=200)
+    invite_reason = serializers.CharField(max_length=300)
+    confirmed = serializers.BooleanField()
+
+    class Meta:        
+        model = sp_player
+        fields = ('event', 'player', 'inviter', 'invite_reason', 'confirmed')
+        depth = 1   
+                             
 class EventSerializerGET (serializers.ModelSerializer):    
     name = serializers.CharField(max_length=200)    
     owner = PersonSerializer ()
     event_date = serializers.DateTimeField()
     location = LocationSerializer()                
-    
+    #player = PlayerSerializerGET()
     
     class Meta:
         model = sp_event
-        fields = ('event_id', 'name', 'owner', 'event_date', 'location', 'player')
+        fields = ('event_id', 'name', 'owner', 'event_date', 'location', 'is_public','player')
         depth = 1        
           
 class PlayerSerializerPOST (serializers.ModelSerializer):
@@ -90,10 +120,11 @@ class PlayerSerializerPOST (serializers.ModelSerializer):
     player = serializers.CharField(max_length=200)
     inviter = serializers.CharField(max_length=200)
     invite_reason = serializers.CharField(max_length=300)
+    confirmed = serializers.BooleanField()
         
     class Meta:
         model = sp_player
-        fields = ('event', 'player', 'inviter', 'invite_reason')
+        fields = ('event', 'player', 'inviter', 'invite_reason', 'confirmed')
         depth = 1
         
     def create (self, validated_data):
@@ -114,15 +145,12 @@ class PlayerSerializerPOST (serializers.ModelSerializer):
         except ObjectDoesNotExist:
             raise serializers.ValidationError()
         
-class PlayerSerializerGET (serializers.ModelSerializer):
-    '''
-    event = EventSerializerGET ()
-    player = PersonSerializer ()
-    inviter = PersonSerializer ()
-    invite_reason = serializers.CharField(max_length=300)            
-    '''
-    
-    class Meta:
-        model = sp_player
-        fields = ('event', 'player', 'inviter', 'invite_reason')
-        #depth = 1                        
+    def update (self, instance, validated_data):
+        try:
+            instance.confirmed = validated_data.get ('confirmed', instance.confirmed)         
+            instance.save()   
+            return instance
+        except ObjectDoesNotExist:
+            raise serializers.ValidationError()    
+        
+                     

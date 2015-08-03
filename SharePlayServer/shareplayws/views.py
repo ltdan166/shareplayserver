@@ -1,12 +1,17 @@
 from django.http import HttpResponse 
 from rest_framework import status
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
 from shareplayws.models import sp_event, sp_person, sp_location, sp_address, sp_player
 from shareplayws.serializers import PersonSerializer, PersonSerializerPOST, EventSerializerPOST, EventSerializerGET, LocationSerializer, AddressSerializer, PlayerSerializerPOST, PlayerSerializerGET
+from datetime import datetime
 from rest_framework.views import APIView
 from rest_framework import generics
 from geopy.distance import vincenty
-from piston_mini_client.failhandlers import NoneFailHandler
+from itertools import chain
+from _datetime import date
+#from piston_mini_client.failhandlers import NoneFailHandler
+#from django.contrib.auth.models import User
 
 
 class PersonList(APIView):
@@ -21,8 +26,8 @@ class PersonList(APIView):
         
     def post (self, request, format=None):
         serializer = PersonSerializerPOST(data=request.data)
-        if serializer.is_valid():            
-            serializer.save()     
+        if serializer.is_valid():                        
+            serializer.save()
             return Response (serializer.data, status=status.HTTP_201_CREATED)
         return Response (serializer.data, status=status.HTTP_400_BAD_REQUEST)  
           
@@ -65,13 +70,46 @@ class EventList (APIView):
     """
     List all or create new event 
     """
+    permission_classes = (IsAuthenticated,)
        
-    def get (self, request, format=None):
-    #list of all event or create new event
-        event = sp_event.objects.all()
-        serializer = EventSerializerGET(event, many = True)
+    #return only events of which user is owner, player or public event 
+    def get (self, format=None):
+        loc_id = self.request.query_params.get ('loc_id', None) 
+        print ("Find event by location_id : "+str(loc_id))    
+        
+        filter_date =   self.request.query_params.get ('date', None)
+        if filter_date is None:
+            filter_date = datetime.now
+        
+        if self.request.user is not None:
+            print (self.request.user)
+            
+            #get sp_person with the loginid
+            owner = sp_person.objects.get (pk=self.request.user.get_username())
+            print (owner)
+            
+            if loc_id is None:
+                owned_events = sp_event.objects.filter(owner=owner, event_date__gte = filter_date)
+                public_events = sp_event.objects.filter(is_public=True, event_date__gte = filter_date)
+                played_events = sp_event.objects.filter(player=owner, event_date__gte = filter_date)
+            else:               
+                location = sp_location.objects.get(location_id = loc_id)
+                owned_events = sp_event.objects.filter(owner=owner, location = location, event_date__gte = filter_date)
+                public_events = sp_event.objects.filter(is_public=True, location = location, event_date__gte = filter_date)
+                played_events = sp_event.objects.filter(player=owner, location = location, event_date__gte = filter_date)
+            
+            #chaining the result
+            events = list (chain(owned_events, public_events, played_events))
+            result = set (events) 
+            
+            for event in result:
+                print (event)
+            
+            
+        serializer = EventSerializerGET(result, many = True)
         return Response(serializer.data)
         
+    #create new event    
     def post (self, request, format=None):            
         serializer = EventSerializerPOST(data=request.data)    
         if serializer.is_valid():
@@ -99,14 +137,29 @@ class EventDetail (APIView):
         return Response(serializer.data)
     
     #if method is PUT, try to update the event
-    def put (self, request, pk, format=None):    
-        event = self.get_object(pk)
-        serializer = EventSerializerPOST (event, data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+    def put (self, request, pk, format=None):
+        #only event's owner can change its details
+        if request.user is not None:
+            print ("Authenticated user : "+request.user)
+            
+            #get sp_person with the loginid
+            owner = sp_person.objects.get (pk=request.user.get_username())
+            print ("Retrieved user profile : "+owner)
+            
+            event = self.get_object(pk)
+            print ("Event's owner : "+event)
+            
+            #if authenticated user is owner, modify event's details
+            if event.owner == owner:
+                serializer = EventSerializerPOST (event, data=request.data)
+                if serializer.is_valid():
+                    serializer.save()
+                    return Response(serializer.data)
+            else:
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            return Response(serializer.errors, status= status.HTTP_401_UNAUTHORIZED)
+        
     #delete the event
     def delete (self, request, pk, format=None):
         event = self.get_object(pk)     
@@ -168,19 +221,44 @@ class PlayerList (APIView):
     """
     List all or create new event 
     """
-       
+    
+    """
+    #return the player list for all matches   
     def get (self, request, format=None):
     #list of all event or create new event
-        player = sp_player.objects.all()
+        player = sp_player.objects.get(event=request.data['event'],confirmed=request.data['confirmed'])
         serializer = PlayerSerializerGET(player, many = True)
         return Response(serializer.data)
+    """
+    
+    #accept invitation when player is added in 
+    def put (self, request, format=None):        
+        playerentry = sp_player.objects.get(event=request.data['event'],player=request.data['player'])        
         
+        if request.data['confirmed']=='True':
+            serializer = PlayerSerializerPOST (playerentry, data=request.data)
+            if serializer.is_valid() :
+                serializer.save()
+                return Response (serializer.data, status=status.HTTP_202_ACCEPTED)
+        else:
+            playerentry.delete()
+            return Response (status=status.HTTP_410_GONE)
+        
+    #delete a player from the match
+    def delete (self, request, format=None):    
+        playerentry = sp_player.objects.get(event=request.data['event'],player=request.data['player'])
+        playerentry.delete()
+        return Response (status=status.HTTP_410_GONE)
+
+    #add player to an event            
     def post (self, request, format=None):            
         serializer = PlayerSerializerPOST(data=request.data)    
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_404_NOT_FOUND)      
+        return Response(serializer.errors, status=status.HTTP_404_NOT_FOUND)    
+
+  
     
 class AddressList (generics.ListCreateAPIView):
     """

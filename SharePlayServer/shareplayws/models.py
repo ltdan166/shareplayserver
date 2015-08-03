@@ -1,7 +1,10 @@
 from django.db import models
-from django.db.models.fields import AutoField
+#from django.db.models.fields import AutoField
 from geopy import Nominatim
-from django.template.defaultfilters import default
+#from django.template.defaultfilters import default
+from django.contrib.auth.models import User
+from rest_framework.authtoken.models import Token
+from django.db.models.signals import post_save
 
 # We create 4 models for the demo : person, event, location, address
     
@@ -31,13 +34,17 @@ class sp_address (models.Model):
         if self.longitude is None or self.latitude is None:
             geolocator = Nominatim ()
             full_add = str(self.street_number) + " " + self.street_name + " " + self.city + " " + self.country
+            print (full_add)
             location = geolocator.geocode (full_add)
-            self.longitude = location.longitude
-            self.latitude = location.latitude
+            if location is not None:
+                self.longitude = location.longitude
+                self.latitude = location.latitude
         super (sp_address, self).save (*args, **kwargs) 
     
 class sp_person (models.Model):
     userid = models.CharField(max_length=10, primary_key=True)
+    password = models.CharField(max_length=50, null=True)
+    profile = models.OneToOneField (User, null=True)
     firstname = models.CharField(max_length=200)
     lastname = models.CharField(max_length=200)
     telephone = models.CharField(max_length=20, null=False)
@@ -63,6 +70,13 @@ class sp_person (models.Model):
             self.last_know_long = self.longitude
             self.last_know_lat = self.latitude
         super (sp_person, self).save (*args, **kwargs)
+        
+def create_profile (sender, instance, created, **kwargs): 
+    if created:
+        profile, created = sp_person.objects.get_or_create(profile=instance)
+        Token.objects.create (user=instance)
+        
+post_save.connect(create_profile, sender=User)
     
 class sp_location (models.Model):    
     location_id = models.AutoField (primary_key=True)
@@ -109,13 +123,14 @@ class sp_event (models.Model):
     player = models.ManyToManyField (sp_person, through='sp_player', through_fields=('event', 'player')) #the player list of each event
 
     def __str__(self):
-        return self.name
+        return str(self.event_id) + " " + self.name
 
 class sp_player (models.Model):
     event = models.ForeignKey (sp_event)
     player = models.ForeignKey (sp_person, related_name="played_for")
     inviter = models.ForeignKey (sp_person, related_name="invited_by")
     invite_reason = models.CharField (max_length=300, null=True)
+    confirmed = models.BooleanField (default=False)
     
     def __str__(self):
         return self.player.firstname + " played for " + self.event.name
