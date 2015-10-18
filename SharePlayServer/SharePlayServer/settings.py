@@ -81,7 +81,7 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
         #'HOST':'192.168.1.83',
-        'HOST':'192.168.1.83',        
+        'HOST':'192.168.1.84',        
         'NAME':'shareplay',
         'USER':'postgres',
         #'USER':'sp_dbadmin',
@@ -102,7 +102,7 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.TokenAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': (
-        'rest_framework.permissions.IsAuthenticated',
+        'rest_framework.permissions.AllowAny',
     )
 }
 
