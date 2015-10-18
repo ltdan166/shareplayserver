@@ -25,6 +25,7 @@ class PersonList(APIView):
         return Response(serializer.data)
         
     def post (self, request, format=None):
+        print (request.data['userid'])
         serializer = PersonSerializerPOST(data=request.data)
         if serializer.is_valid():                        
             serializer.save()
@@ -122,6 +123,8 @@ class EventDetail (APIView):
     Retrieve, update, delete an event
     """
     
+    permission_classes = (IsAuthenticated,)
+    
     #try to find the person with the pk, if not found, return an error
     def get_object (self, pk):
         try:
@@ -170,7 +173,8 @@ class EventDetail (APIView):
 class LocationList (APIView):
     """
     List of all locations or create new location
-    """
+    """   
+    permission_classes = (IsAuthenticated,)
     
     def get (self, request, format=None):    
         location = sp_location.objects.all()

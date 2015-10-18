@@ -73,7 +73,7 @@ class sp_person (models.Model):
         
 def create_profile (sender, instance, created, **kwargs): 
     if created:
-        profile, created = sp_person.objects.get_or_create(profile=instance)
+        #profile, created = sp_person.objects.get_or_create(profile=instance)
         Token.objects.create (user=instance)
         
 post_save.connect(create_profile, sender=User)

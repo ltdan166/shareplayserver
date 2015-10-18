@@ -44,7 +44,7 @@ class PersonSerializerPOST (serializers.ModelSerializer):
         postal_address.save ()
         
         #create a person with address
-        person = sp_person (userid = validated_data['userid'], password = validated_data['password'], firstname = validated_data['firstname'], lastname = validated_data['lastname'], email=validated_data['email'], telephone=validated_data['telephone'], postal_address=postal_address)
+        person = sp_person (userid = validated_data['userid'], password = validated_data['password'], firstname = validated_data['firstname'], lastname = validated_data['lastname'], email=validated_data['email'], telephone=validated_data['telephone'], postal_address=postal_address)        
         person.save ()
         
         #create the user profile of the person
