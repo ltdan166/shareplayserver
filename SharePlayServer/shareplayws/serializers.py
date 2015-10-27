@@ -130,7 +130,12 @@ class PlayerSerializerPOST (serializers.ModelSerializer):
     def create (self, validated_data):
         try:                        
             #get player
-            player_person = sp_person.objects.get(userid=validated_data['player'])            
+            try:
+                player_person = sp_person.objects.get(userid=validated_data['player'])  
+            except ObjectDoesNotExist:
+                #if the invited person is not in the system yet
+                player_person = sp_person (userid = validated_data['player'], password = 'shareplay', firstname='TO BE CONFIRMED', lastname='TO BE CONFIRMED')
+                player_person.save()
             
             #get event
             event = sp_event.objects.get (event_id=validated_data['event'])
@@ -139,7 +144,7 @@ class PlayerSerializerPOST (serializers.ModelSerializer):
             #if validated_data['inviter'] != '' :
             inviter = sp_person.objects.get(userid=validated_data['inviter'])
             
-            player = sp_player (event=event, player=player_person, inviter=inviter, invite_reason=validated_data['invite_reason'])
+            player = sp_player (event=event, player=player_person, inviter=inviter, invite_reason=validated_data['invite_reason'], confirmed = False)
             player.save()
             return player                 
         except ObjectDoesNotExist:
